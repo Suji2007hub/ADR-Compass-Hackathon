@@ -1,66 +1,124 @@
 /**
- * API client for communicating with the backend
- * Handles all HTTP requests to the ADR prediction API
+ * API client for ADR-Compass
  */
+
 import axios from 'axios'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'
+// Render backend URL
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  'https://adr-compass-hackathon.onrender.com'
 
 const client = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json'
-  }
+    'Content-Type': 'application/json',
+  },
+  timeout: 60000,
 })
 
 /**
- * Predict ADR risk for a patient-medication pair
- * @param {Object} patient - Patient demographics and medical info
- * @param {Object} medication - Medication details
- * @param {boolean} useEnhanced - Use enhanced model with blood group
- * @returns {Promise<Object>} Prediction result with risk score, category, and factors
+ * Complete ADR risk assessment
+ *
+ * Sends patient + medication information
+ * to Model A and Model B through /assess.
  */
-export const predictADRRisk = async (patient, medication, useEnhanced = true) => {
+export const predictADRRisk = async (
+  patient,
+  medication,
+  useEnhanced = true
+) => {
   try {
-    const response = await client.post('/predict', {
-      patient,
-      medication,
-      use_enhanced: useEnhanced
-    })
+    const payload = {
+      age: Number(patient.age),
+      sex: patient.sex,
+
+      drug_name: medication.drug_name,
+      drug_class: medication.drug_class,
+      medical_condition: medication.medical_condition,
+      previous_adr: Number(medication.previous_adr ?? 0),
+
+      blood_group: useEnhanced
+        ? medication.blood_group ?? patient.blood_group ?? null
+        : null,
+
+      rh_factor: useEnhanced
+        ? medication.rh_factor ?? patient.rh_factor ?? null
+        : null,
+    }
+
+    console.log('Sending assessment:', payload)
+
+    const response = await client.post('/assess', payload)
+
+    console.log('Assessment response:', response.data)
+
     return response.data
   } catch (error) {
-    console.error('Error calling predict endpoint:', error)
-    throw error
+    console.error('ADR assessment failed:', error)
+
+    if (error.response) {
+      throw new Error(
+        `Backend error (${error.response.status}): ${
+          error.response.data?.detail || 'Unable to complete assessment'
+        }`
+      )
+    }
+
+    if (error.request) {
+      throw new Error(
+        'Unable to connect to the ADR-Compass backend. Please check that the backend is deployed and running.'
+      )
+    }
+
+    throw new Error(error.message || 'Unable to generate prediction')
   }
 }
 
 /**
- * Get SHAP-based explanation for a prediction
- * @param {string} predictionId - ID of the prediction to explain
- * @returns {Promise<Object>} SHAP explanation with feature importance
+ * Optional explanation endpoint.
+ *
+ * Kept for compatibility with the dashboard.
  */
 export const getExplanation = async (predictionId) => {
   try {
     const response = await client.get(`/explain/${predictionId}`)
     return response.data
   } catch (error) {
-    console.error('Error fetching explanation:', error)
-    throw error
+    console.error('Explanation request failed:', error)
+
+    if (error.response) {
+      throw new Error(
+        `Explanation error (${error.response.status}): ${
+          error.response.data?.detail || 'Explanation unavailable'
+        }`
+      )
+    }
+
+    throw new Error('Unable to retrieve explanation')
   }
 }
 
 /**
- * Get SHAP summary plot for a prediction
- * @param {string} predictionId - ID of the prediction
- * @returns {Promise<Object>} Plot URL
+ * Optional SHAP plot endpoint.
  */
 export const getExplanationPlot = async (predictionId) => {
   try {
-    const response = await client.get(`/explain/plots/${predictionId}`)
+    const response = await client.get(
+      `/explain/plots/${predictionId}`
+    )
+
     return response.data
   } catch (error) {
-    console.error('Error fetching explanation plot:', error)
-    throw error
+    console.error('Explanation plot request failed:', error)
+
+    if (error.response) {
+      throw new Error(
+        `Explanation plot error (${error.response.status})`
+      )
+    }
+
+    throw new Error('Unable to retrieve explanation plot')
   }
 }
 
