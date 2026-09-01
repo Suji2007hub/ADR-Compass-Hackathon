@@ -1,65 +1,167 @@
 /**
  * Prediction Dashboard Page
- * Displays ADR risk prediction and SHAP explanation
+ * Displays ADR risk prediction and model comparison
  */
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { RiskScoreCard } from '../components/RiskScoreCard'
-import { SHAPVisualizer } from '../components/SHAPVisualizer'
-import { getExplanation } from '../api/client'
 
 export const PredictionDashboardPage = ({ prediction, onReset }) => {
-  const [explanation, setExplanation] = useState(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(null)
-
-  useEffect(() => {
-    const fetchExplanation = async () => {
-      if (!prediction) return
-      
-      setLoading(true)
-      setError(null)
-      try {
-        const exp = await getExplanation(prediction.prediction_id)
-        setExplanation(exp)
-      } catch (err) {
-        setError('Failed to load explanation: ' + err.message)
-        console.error('Error fetching explanation:', err)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchExplanation()
-  }, [prediction])
-
   if (!prediction) {
     return <div className="page">No prediction available</div>
   }
+
+  const primary = prediction.primary_prediction
+  const comparison = prediction.model_comparison
+  const management = prediction.risk_management
+  const experimental = prediction.experimental_feature
 
   return (
     <div className="page prediction-dashboard-page">
       <h2>Prediction Results</h2>
 
       <RiskScoreCard
-        riskScore={prediction.risk_score}
-        riskCategory={prediction.risk_category}
-        confidence={prediction.confidence}
+        riskScore={primary?.risk_score}
+        riskCategory={primary?.risk_level}
+        confidence={primary?.adr_probability}
       />
 
       <div className="prediction-details">
-        <p><strong>Prediction ID:</strong> {prediction.prediction_id}</p>
-        <p><strong>Model Version:</strong> {prediction.model_version}</p>
+        <h3>Patient Information</h3>
+
+        <p>
+          <strong>Age:</strong> {prediction.patient?.age}
+        </p>
+
+        <p>
+          <strong>Sex:</strong> {prediction.patient?.sex}
+        </p>
+
+        <p>
+          <strong>Blood Group:</strong>{' '}
+          {prediction.patient?.blood_group || 'Unknown'}
+        </p>
+
+        <p>
+          <strong>Rh Factor:</strong>{' '}
+          {prediction.patient?.rh_factor || 'Unknown'}
+        </p>
+
+        <h3>Medication Information</h3>
+
+        <p>
+          <strong>Drug:</strong>{' '}
+          {prediction.medication?.drug_name}
+        </p>
+
+        <p>
+          <strong>Drug Class:</strong>{' '}
+          {prediction.medication?.drug_class}
+        </p>
+
+        <p>
+          <strong>Medical Condition:</strong>{' '}
+          {prediction.medication?.medical_condition}
+        </p>
+
+        <p>
+          <strong>Previous ADR:</strong>{' '}
+          {prediction.medication?.previous_adr === 1 ? 'Yes' : 'No'}
+        </p>
+
+        <h3>Model Prediction</h3>
+
+        <p>
+          <strong>Primary Model:</strong>{' '}
+          {primary?.model_name || 'N/A'}
+        </p>
+
+        <p>
+          <strong>ADR Probability:</strong>{' '}
+          {primary?.adr_probability != null
+            ? `${(primary.adr_probability * 100).toFixed(2)}%`
+            : 'N/A'}
+        </p>
+
+        <p>
+          <strong>Risk Score:</strong>{' '}
+          {primary?.risk_score ?? 'N/A'}
+        </p>
+
+        <p>
+          <strong>Risk Level:</strong>{' '}
+          {primary?.risk_level || 'N/A'}
+        </p>
       </div>
 
-      {loading && <div className="loading">Loading explanation...</div>}
-      {error && <div className="error-message">{error}</div>}
+      {comparison && (
+        <div className="prediction-details">
+          <h3>Model Comparison</h3>
 
-      {explanation && !loading && (
-        <SHAPVisualizer explanation={explanation} />
+          <p>
+            <strong>Model A — Baseline:</strong>{' '}
+            {comparison.model_a?.probability != null
+              ? `${(comparison.model_a.probability * 100).toFixed(2)}%`
+              : 'N/A'}{' '}
+            ({comparison.model_a?.risk_level || 'N/A'})
+          </p>
+
+          <p>
+            <strong>Model B — Enhanced:</strong>{' '}
+            {comparison.model_b?.probability != null
+              ? `${(comparison.model_b.probability * 100).toFixed(2)}%`
+              : 'N/A'}{' '}
+            ({comparison.model_b?.risk_level || 'N/A'})
+          </p>
+
+          <p>
+            <strong>Probability Difference:</strong>{' '}
+            {comparison.probability_difference != null
+              ? `${(comparison.probability_difference * 100).toFixed(2)} percentage points`
+              : 'N/A'}
+          </p>
+        </div>
+      )}
+
+      {management && (
+        <div className="prediction-details">
+          <h3>{management.title}</h3>
+
+          <ul>
+            {management.actions?.map((action, index) => (
+              <li key={index}>{action}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {experimental && (
+        <div className="prediction-details">
+          <h3>Experimental Feature</h3>
+
+          <p>
+            <strong>Blood Group:</strong>{' '}
+            {experimental.blood_group || 'Unknown'}
+          </p>
+
+          <p>
+            {experimental.message}
+          </p>
+        </div>
+      )}
+
+      {prediction.disclaimer && (
+        <div className="prediction-details">
+          <h3>Clinical Disclaimer</h3>
+
+          <p>{prediction.disclaimer}</p>
+        </div>
       )}
 
       <div className="dashboard-actions">
-        <button onClick={onReset} className="btn btn-primary">
+        <button
+          onClick={onReset}
+          className="btn btn-primary"
+        >
           New Prediction
         </button>
       </div>
@@ -68,3 +170,4 @@ export const PredictionDashboardPage = ({ prediction, onReset }) => {
 }
 
 export default PredictionDashboardPage
+

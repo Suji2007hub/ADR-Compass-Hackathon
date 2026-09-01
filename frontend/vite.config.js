@@ -7,9 +7,10 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.VITE_API_BASE_URL || 'http://localhost:8000',
+        target: 'https://adr-compass-hackathon.onrender.com',
         changeOrigin: true,
-        rewrite: (path) => path
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api/, '')
       }
     }
   }
